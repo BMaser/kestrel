@@ -1,7 +1,7 @@
 name: tests
 on:
   push:
-    branches-ignore: [gz-two-laps]   # that branch runs these tests inside .github/workflows/gz-two-laps.yml (one run per push)
+    branches-ignore: [gz-two-laps, ui-window]   # those branches run these tests inside .github/workflows/gz-two-laps.yml (one run per push)
   pull_request:
   workflow_dispatch:
 jobs:

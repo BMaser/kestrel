@@ -6,8 +6,13 @@ name: gz two laps
 
 on:
   push:
-    branches: [gz-two-laps]
+    branches: [gz-two-laps, ui-window]
   workflow_dispatch:
+    inputs:
+      ui:
+        description: "Also open Gazebo's window and QGroundControl on the runner's virtual screen and film that screen (ui_screen.mp4)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -18,7 +23,9 @@ env:
 jobs:
   fly:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 80
+    env:
+      UI: ${{ (github.event_name == 'push' && github.ref_name == 'ui-window') || inputs.ui == true }}
     steps:
       - uses: actions/checkout@v4
 
@@ -28,6 +35,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends python3-numpy python3-scipy
           for t in test_course test_route test_world test_analysis; do timeout 300 /usr/bin/python3 -I tests/$t.py; done
+          /usr/bin/python3 -m py_compile colab/*.py sim/gz_px4/*.py
+          /usr/bin/python3 -c "import json; nb = json.load(open('colab/Kestrel_UI_PX4_Gazebo_QGroundControl.ipynb')); print('notebook ok,', len(nb['cells']), 'cells')"
 
       - name: Restore the built PX4 checkout
         id: px4cache
@@ -70,12 +79,36 @@ jobs:
 
       - name: Fly two laps, make the films and result.json
         id: fly
-        timeout-minutes: 32
+        timeout-minutes: 55
         continue-on-error: true
         run: |
           mkdir -p results
           set -o pipefail
-          .venv/bin/python -m sim.gz_px4.fly --px4 px4 --out results 2>&1 | tee results/run.log
+          EXTRA=""
+          if [ "$UI" = "true" ]; then
+            # the same desktop as the Colab UI notebook (colab/ui_desktop.py, colab/ui_qgc.py), without VNC: Gazebo's window + QGroundControl
+            sudo apt-get install -y --no-install-recommends fluxbox libfuse2 gstreamer1.0-plugins-bad gstreamer1.0-libav gstreamer1.0-gl \
+              libxcb-xinerama0 libxkbcommon-x11-0 libxcb-cursor0 libegl1 libpulse-mainloop-glib0 > results/ui_apt.log 2>&1 || true
+            Xvfb :1 -screen 0 1600x900x24 -ac +extension GLX +render -noreset > results/ui_xvfb.log 2>&1 &
+            sleep 3
+            DISPLAY=:1 fluxbox > results/ui_fluxbox.log 2>&1 &
+            url=$(curl -s https://api.github.com/repos/mavlink/qgroundcontrol/releases/latest | grep -o '"browser_download_url": *"[^"]*\.AppImage"' | grep -o 'https[^"]*' | grep -E 'x86_64|amd64' | head -n 1)
+            echo "QGroundControl: $url" | tee results/qgc_version.txt
+            mkdir -p qgc && (cd qgc && wget -q -O QGC.AppImage "$url" && chmod +x QGC.AppImage && ./QGC.AppImage --appimage-extract > /dev/null) || echo "QGC download failed" >> results/qgc_version.txt
+            DISPLAY=:1 LIBGL_ALWAYS_SOFTWARE=1 QT_QPA_PLATFORM=xcb setsid qgc/squashfs-root/AppRun > results/qgc_run.log 2>&1 &
+            ffmpeg -loglevel error -f x11grab -framerate 2 -video_size 1600x900 -i :1 -c:v libx264 -pix_fmt yuv420p results/ui_screen.mp4 > results/ui_ffmpeg.log 2>&1 &
+            echo $! > ui_ffmpeg.pid
+            EXTRA="--gui-display :1 --flight-timeout-min 45"
+          fi
+          rc=0
+          .venv/bin/python -m sim.gz_px4.fly --px4 px4 --out results $EXTRA 2>&1 | tee results/run.log || rc=$?
+          if [ -f ui_ffmpeg.pid ]; then
+            ffmpeg -loglevel error -f x11grab -video_size 1600x900 -i :1 -frames:v 1 results/ui_end.png || true
+            pgrep -fa 'QGroundControl|gz sim' > results/ui_processes_at_end.txt || true
+            kill -INT "$(cat ui_ffmpeg.pid)"; sleep 5
+            ffmpeg -loglevel error -i results/ui_screen.mp4 -vf "fps=1/20,scale=800:-1,tile=3x3" -frames:v 1 results/ui_contact.png || true
+          fi
+          exit $rc
 
       - name: Job summary
         if: always()

@@ -258,12 +258,20 @@ def subscribe_camera(S: Shared, name: str, topic: str):
 
 
 # ------------------------------------------------------------------------------------------------ start and stop the simulator
+GUI_DISPLAY = None  # --gui-display: show Gazebo's own window on this X display (the Colab desktop) instead of running headless
+
+
 def start_stack(out: Path, px4: Path):
     procs = {}
-    env = {**os.environ, "DISPLAY": ":99", "LIBGL_ALWAYS_SOFTWARE": "1", "HEADLESS": "1", "GZ_VERBOSE": "2"}
-    procs["xvfb"] = subprocess.Popen(["Xvfb", ":99", "-screen", "0", "1280x1024x24", "+extension", "GLX", "+render", "-noreset"],
-                                     stdout=open(out / "xvfb.log", "w"), stderr=subprocess.STDOUT, start_new_session=True)
-    time.sleep(3)
+    if GUI_DISPLAY:
+        env = {**os.environ, "DISPLAY": GUI_DISPLAY, "LIBGL_ALWAYS_SOFTWARE": "1", "GZ_VERBOSE": "2"}
+        env.pop("HEADLESS", None)
+        os.environ.pop("HEADLESS", None)  # PX4's start script opens the Gazebo window when HEADLESS is not set
+    else:
+        env = {**os.environ, "DISPLAY": ":99", "LIBGL_ALWAYS_SOFTWARE": "1", "HEADLESS": "1", "GZ_VERBOSE": "2"}
+        procs["xvfb"] = subprocess.Popen(["Xvfb", ":99", "-screen", "0", "1280x1024x24", "+extension", "GLX", "+render", "-noreset"],
+                                         stdout=open(out / "xvfb.log", "w"), stderr=subprocess.STDOUT, start_new_session=True)
+        time.sleep(3)
     os.environ.update(env)
     cmd = f'cd "{px4}" && sleep 4000 | setsid make px4_sitl gz_x500_mono_cam_baylands > "{out / "sim.log"}" 2>&1'
     procs["px4"] = subprocess.Popen(["bash", "-c", cmd], env=env, start_new_session=True)
@@ -652,7 +660,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--px4", default="px4")
     ap.add_argument("--out", default="results")
+    ap.add_argument("--gui-display", default=None, help="X display for Gazebo's own window, e.g. :1 (Colab desktop); default headless")
+    ap.add_argument("--flight-timeout-min", type=float, default=FLIGHT_TIMEOUT_S / 60, help="wall-clock limit of the flight")
     a = ap.parse_args()
+    global GUI_DISPLAY, FLIGHT_TIMEOUT_S
+    GUI_DISPLAY, FLIGHT_TIMEOUT_S = a.gui_display, a.flight_timeout_min * 60
     out = Path(a.out).resolve()
     out.mkdir(parents=True, exist_ok=True)
     run = run_stack(out, Path(a.px4).resolve())
