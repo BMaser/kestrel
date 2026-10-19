@@ -657,13 +657,13 @@ def write_result(out: Path, run: dict) -> dict:
 
 
 def main():
+    global GUI_DISPLAY, FLIGHT_TIMEOUT_S
     ap = argparse.ArgumentParser()
     ap.add_argument("--px4", default="px4")
     ap.add_argument("--out", default="results")
     ap.add_argument("--gui-display", default=None, help="X display for Gazebo's own window, e.g. :1 (Colab desktop); default headless")
     ap.add_argument("--flight-timeout-min", type=float, default=FLIGHT_TIMEOUT_S / 60, help="wall-clock limit of the flight")
     a = ap.parse_args()
-    global GUI_DISPLAY, FLIGHT_TIMEOUT_S
     GUI_DISPLAY, FLIGHT_TIMEOUT_S = a.gui_display, a.flight_timeout_min * 60
     out = Path(a.out).resolve()
     out.mkdir(parents=True, exist_ok=True)
