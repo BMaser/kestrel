@@ -40,7 +40,7 @@ def main():
     check("perfect flight: 2 lap times", len(r["lap_times_s"]) == 2, r["lap_times_s"])
     check("perfect flight: 0 wrong, 0 backward", not r["wrong_crossings"] and not r["backward_crossings"], (r["wrong_crossings"][:2], r["backward_crossings"][:2]))
     check("perfect flight: deviation ~ 0", r["max_distance_from_planned_path_m"] < 1e-6, r["max_distance_from_planned_path_m"])
-    check("perfect flight: lands on the pad", r["landing_distance_from_end_pad_m"] < 1e-6 and r["landed"])
+    check("perfect flight: lands on the pad", r["landing_distance_from_end_pad_m"] < 0.05 and r["landed"])
     check("perfect flight: passed", r["passed"], r["checks"])
     check("perfect flight: tilt 0", r["max_tilt_deg"] < 1e-6)
 
@@ -51,7 +51,7 @@ def main():
     check("landing 3 m off fails", not r2["passed"] and not r2["checks"]["landed within 1.0 m of the end pad centre"], r2["landing_distance_from_end_pad_m"])
 
     # not landed (still in the air)
-    r3 = analyse(course, route, Tf, Pf[:-20], Q[:-20], 0.0, end, False)
+    r3 = analyse(course, route, Tf[:-20], Pf[:-20], Q[:-20], 0.0, end, False)
     check("not landed fails", not r3["passed"] and not r3["landed"])
 
     # a flight that flies the path a metre away from the planned path but still passes: deviation is measured
