@@ -25,5 +25,10 @@
     "how": "take-off to (0,0,0.8); for every gate, a point 0.35 m before its center along yaw, the center, and a point 0.35 m after; plus the detour points below, inserted after the gate named; then the end pad at height 0.8 and land. A smooth curve through these points is fine if it keeps at least 0.2 m (scale 1) from every obstacle and passes each gate opening.",
     "detours": {"after_G1": [2.5, 0.15, 1.1], "after_G3": [5.7, -0.5, 0.8], "after_G4": [4.0, -1.65, 1.15]}
   },
+  "lap_junction": {
+    "written": "2026-10-19 (Kestrel): the way from the point after G7 to the point before G1 of the next lap",
+    "why": "on 2026-10-18 the straight way from the end of lap 1 into lap 2 went through G7 backwards and the drone stuck on its frame; these points go round G7 on its west side, over the start pad, and come into G1 from behind",
+    "points": [[-0.45, 1.85, 0.9], [-0.85, 0.9, 0.85], [-0.55, 0.0, 0.8]]
+  },
   "success": "7 of 7 gates passed in order through the opening, 0 contacts with gates or obstacles, landing on the end pad. Report the lap time, the largest tilt, the closest distance to each obstacle, and any gate missed."
 }
