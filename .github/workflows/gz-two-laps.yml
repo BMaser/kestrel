@@ -1,0 +1,105 @@
+name: gz two laps
+
+# Two laps of the hard race course (tracks/hard_race_v1.json, scale 4) in PX4 v1.17.0 SITL + Gazebo Harmonic, x500 with one forward nose camera,
+# MAVSDK offboard setpoints, live lap counter, films made on the runner. Free runner: 4 cores, no graphics card (Xvfb + Mesa software drawing).
+# See sim/gz_px4/fly.py. Nothing of this runs on the owner's PC.
+
+on:
+  push:
+    branches: [gz-two-laps]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PX4_TAG: v1.17.0
+
+jobs:
+  fly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Offline tests (course, route, world, analysis)
+        run: |
+          set -e
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends python3-numpy python3-scipy
+          for t in test_course test_route test_world test_analysis; do timeout 300 /usr/bin/python3 -I tests/$t.py; done
+
+      - name: Restore the built PX4 checkout
+        id: px4cache
+        uses: actions/cache/restore@v4
+        with:
+          path: px4
+          key: px4-${{ env.PX4_TAG }}-sitl-gz-v1
+
+      - name: Get PX4-Autopilot
+        if: steps.px4cache.outputs.cache-hit != 'true'
+        run: git clone --branch "$PX4_TAG" --depth 1 --recurse-submodules --shallow-submodules https://github.com/PX4/PX4-Autopilot.git px4
+
+      - name: Install tools, Gazebo Harmonic, ffmpeg, matplotlib and MAVSDK
+        run: |
+          set -e
+          mkdir -p results
+          git -C px4 rev-parse HEAD | tee results/px4_version.txt
+          sudo apt-get install -y --no-install-recommends xvfb xauth mesa-utils libgl1-mesa-dri libglx-mesa0 libegl-mesa0 ffmpeg
+          bash px4/Tools/setup/ubuntu.sh --no-nuttx
+          sudo apt-get install -y python3-gz-transport13 python3-gz-msgs10 python3-numpy python3-scipy python3-matplotlib python3-venv
+          python3 -m venv --system-site-packages .venv
+          .venv/bin/pip install 'mavsdk<4'
+          .venv/bin/python -c "import mavsdk, numpy, scipy, matplotlib; from gz.transport13 import Node; from gz.msgs10.pose_v_pb2 import Pose_V; from gz.msgs10.image_pb2 import Image; print('mavsdk', mavsdk.__file__, 'numpy', numpy.__version__, 'scipy', scipy.__version__, 'matplotlib', matplotlib.__version__, 'gz bindings ok')" | tee results/python_versions.txt
+          gz sim --versions | tee results/gz_version.txt
+          ffmpeg -version | head -n 1
+
+      - name: Build PX4 SITL
+        if: steps.px4cache.outputs.cache-hit != 'true'
+        run: |
+          (cd px4 && make px4_sitl_default) > results/build.log 2>&1 || { tail -n 80 results/build.log; exit 1; }
+          tail -n 3 results/build.log
+
+      - name: Save the built PX4 checkout
+        if: steps.px4cache.outputs.cache-hit != 'true'
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: px4
+          key: px4-${{ env.PX4_TAG }}-sitl-gz-v1
+
+      - name: Fly two laps, make the films and result.json
+        id: fly
+        timeout-minutes: 32
+        continue-on-error: true
+        run: |
+          mkdir -p results
+          set -o pipefail
+          .venv/bin/python -m sim.gz_px4.fly --px4 px4 --out results 2>&1 | tee results/run.log
+
+      - name: Job summary
+        if: always()
+        run: |
+          if [ -f results/result.json ]; then
+            python3 -c "import json; r=json.load(open('results/result.json')); print('### gz two laps\n'); print('passed:', r.get('passed')); print('checks:', json.dumps(r.get('checks'), indent=1)); print('gates', r.get('gates_passed'), 'lap times', r.get('lap_times_s'), 'rtf', r.get('real_time_factor'), 'camera fps', r.get('camera_fps'))" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No result.json (fly step: ${{ steps.fly.outcome }})." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          df -h / | tail -n 1
+
+      - name: Keep the tail of the simulator log, drop big files
+        if: always()
+        run: |
+          for f in results/sim.log; do [ -f "$f" ] && tail -n 600 "$f" > results/sim_tail.log && if [ "$(stat -c %s "$f")" -gt 20000000 ]; then rm -f "$f"; fi; done
+          true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gz-two-laps-results
+          path: results/
+          if-no-files-found: warn
+
+      - name: Fail the job when the flight failed
+        if: always()
+        run: test "${{ steps.fly.outcome }}" = success

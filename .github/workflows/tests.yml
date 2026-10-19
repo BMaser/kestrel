@@ -1,6 +1,7 @@
 name: tests
 on:
   push:
+    branches-ignore: [gz-two-laps]   # that branch runs these tests inside .github/workflows/gz-two-laps.yml (one run per push)
   pull_request:
   workflow_dispatch:
 jobs:
@@ -15,3 +16,5 @@ jobs:
       - run: pip install numpy scipy
       - run: timeout 300 python -I tests/test_course.py
       - run: timeout 300 python -I tests/test_route.py
+      - run: timeout 300 python -I tests/test_world.py
+      - run: timeout 300 python -I tests/test_analysis.py
