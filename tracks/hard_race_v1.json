@@ -1,0 +1,29 @@
+{
+  "name": "hard_race_v1",
+  "written": "2026-10-16 by the main session (Opus); checked with linear segments between the waypoints: pole_1 clearance 0.258 m, pole_2 0.356 m, box_1 0.26 m, no gate frame touched, path 16.69 m, height 0.6 to 1.6 m",
+  "units": "metres at scale 1 (Crazyflie size). Multiply every coordinate and every size by the simulator's scale. Use scale 1 for a drone about 0.1 m wide, scale 4 for a drone about 0.5 to 0.7 m wide (as the PX4 + Gazebo base lap did with the x500). Say which scale you used.",
+  "frame": "x forward from the start pad, y to the left, z up. The start pad is at (0, 0, 0). yaw_deg is the direction in which the drone must pass through the gate, 0 = +x, counter-clockwise positive.",
+  "gate_opening_m": 0.5,
+  "gate_frame_outer_m": 0.7,
+  "start_pad": [0.0, 0.0, 0.0],
+  "end_pad": [-0.3, 2.0, 0.0],
+  "gates": [
+    {"id": "G1", "center": [1.5, 0.0, 0.8], "yaw_deg": 0},
+    {"id": "G2", "center": [3.5, 1.2, 1.4], "yaw_deg": 45},
+    {"id": "G3", "center": [5.5, 0.5, 1.0], "yaw_deg": -60},
+    {"id": "G4", "center": [5.0, -1.5, 0.6], "yaw_deg": -150},
+    {"id": "G5", "center": [3.0, -1.8, 1.3], "yaw_deg": 180},
+    {"id": "G6", "center": [1.2, -0.6, 1.6], "yaw_deg": 145},
+    {"id": "G7", "center": [0.2, 1.2, 0.9], "yaw_deg": 100}
+  ],
+  "obstacles": [
+    {"id": "pole_1", "kind": "vertical pole", "center_xy": [2.5, 0.6], "radius": 0.05, "height": 2.5, "why": "stands on the straight line from G1 to G2"},
+    {"id": "pole_2", "kind": "vertical pole", "center_xy": [5.25, -0.5], "radius": 0.05, "height": 2.5, "why": "stands on the straight line from G3 to G4"},
+    {"id": "box_1", "kind": "box on the floor", "center_xy": [4.0, -1.65], "size_xy": 0.3, "height": 0.7, "why": "the path from G4 to G5 must climb over it"}
+  ],
+  "waypoints_hint": {
+    "how": "take-off to (0,0,0.8); for every gate, a point 0.35 m before its center along yaw, the center, and a point 0.35 m after; plus the detour points below, inserted after the gate named; then the end pad at height 0.8 and land. A smooth curve through these points is fine if it keeps at least 0.2 m (scale 1) from every obstacle and passes each gate opening.",
+    "detours": {"after_G1": [2.5, 0.15, 1.1], "after_G3": [5.7, -0.5, 0.8], "after_G4": [4.0, -1.65, 1.15]}
+  },
+  "success": "7 of 7 gates passed in order through the opening, 0 contacts with gates or obstacles, landing on the end pad. Report the lap time, the largest tilt, the closest distance to each obstacle, and any gate missed."
+}
